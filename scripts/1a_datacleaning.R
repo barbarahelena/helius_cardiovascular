@@ -246,7 +246,8 @@ tax <- readRDS("data/16s/phyloseq/rarefied/taxtable_rarefied.RDS")
 head(tax)
 notbacteria <- tax %>% filter(Kingdom != "Bacteria")
 tax2 <- tax %>% filter(Kingdom == "Bacteria") %>% 
-    mutate(Tax2 = case_when(str_starts(Tax, "UCG") | str_starts(Tax, "NK") | str_starts(Tax, "GCA") ~ str_c(Family, " ", Tax)))
+    mutate(Tax = case_when(str_starts(Tax, "UCG") | str_starts(Tax, "NK") | str_starts(Tax, "GCA") ~ str_c(Family, " ", Tax),
+                           .default = Tax))
 saveRDS(tax2, "data/taxtable_rarefied_cleaned.RDS")
 
 mbtot <- readRDS("data/16S/phyloseq/rarefied/phyloseq_rarefied.RDS")
