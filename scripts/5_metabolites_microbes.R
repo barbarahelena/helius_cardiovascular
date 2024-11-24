@@ -66,16 +66,16 @@ mbsel$ID <- rownames(mbsel)
 
 mbmet <- left_join(mbsel, metsel, by = "ID")
 dim(mbmet)
-names(mbmet)[1:13]
+names(mbmet)[1:17]
 res <- c()
 mbmet$asv <- NULL
 mbmet$met <- NULL
 plothist <- c()
-for(a in 1:17) {
+for(a in 1:18) {
     mbmet$asv <- mbmet[[a]]
     asvname <- names(mbmet)[a]
     plothist[[asvname]] <- gghistogram(mbmet$asv) + labs(x = asvname)
-    for(b in 19:(ncol(mbmet) -1)) {
+    for(b in 20:(ncol(mbmet) -1)) {
         mbmet$met <- mbmet[[b]]
         metname <- names(mbmet)[b]
         cor <- cor.test(mbmet$asv, y = mbmet$met, method = "spearman")
@@ -88,11 +88,12 @@ for(a in 1:17) {
 }
 
 ggarrange(plotlist = plothist, nrow = 4, ncol = 5, 
-          labels = c(LETTERS[1:17]))
+          labels = c(LETTERS[1:18]))
 ggsave("results/asv_distribution.pdf", width = 12, height = 26)
 
 res <- as.data.frame(res)
 res2 <- res %>% mutate(across(c(3:4), as.numeric)) %>% 
+    filter(metabolite != "asv") %>% 
     group_by(ASV) %>% 
     mutate(padj = p.adjust(pval, "fdr")) %>% 
     ungroup(.)
@@ -131,23 +132,28 @@ for(a in 1:nrow(reswide_rho)){
         )
     topmets <- rlong %>%
         filter(padj < 0.05) %>% 
-        group_by(dir) %>% arrange(padj) %>% slice(1:15) %>% ungroup(.)
+        group_by(dir) %>% arrange(padj) %>% slice(1:10) %>% ungroup(.)
     rlong <- rlong %>% mutate(met = ifelse(met %in% topmets$met, met, NA))
     if(nrow(topmets) > 0){
         colvec <- c("negative correlation" = pal_aaas()(1), "not sig" = "grey", "positive correlation" = pal_aaas()(2)[2])
         plotlist[[reswide_rho$ASV[a]]] <- ggplot(data = rlong, aes(x = rho, y = pval, color = sigdir)) +
             geom_point() +
-            geom_label_repel(aes(label = met), color = "black", size = 3,
-                             min.segment.length = 0.2, force = 1, box.padding = 0.4) +
+            geom_label_repel(aes(label = met), color = "black", 
+                             size = 2.5, direction = "both",
+                             min.segment.length = 0.5,
+                             force_pull = 0.3,
+                             box.padding = 0.1,
+                             ) +
             scale_color_manual(values = colvec) +
             labs(title = taxname, x = "spearman's rho", y = "-log10(p-value)", color = "") +
             theme_Publication()
     }
 }
 
-
-ggarrange(plotlist = plotlist[1:12], nrow = 4, ncol = 3, labels = LETTERS[1:12], common.legend = TRUE, legend = "bottom")
-ggsave("results/volcano_correlations.pdf", width = 20, height = 24)
+ggarrange(plotlist = plotlist[1:length(plotlist)], 
+          nrow = 5, ncol = 3, labels = LETTERS[1:13], 
+          common.legend = TRUE, legend = "bottom")
+ggsave("results/correlations/volcano_correlations.pdf", width = 15, height = 24)
 
 infofile <- rio::import("data/metabolomics/Info_HELIUS_metabolomics.xlsx") %>% 
     dplyr::select(metabolite = CHEMICAL_NAME, superpathway = SUPER_PATHWAY, subpathway = SUB_PATHWAY)
@@ -158,7 +164,7 @@ tot <- res2 %>% filter(padj < 0.05) %>% arrange(padj) %>%
 nlevels(as.factor(tot$metabolite))
 
 tot %>% filter(superpathway != "Xenobiotics") %>% dplyr::select(metabolite, Tax, superpathway, subpathway)
-
+tot %>% arrange(padj)
 (asv_indole <- tot %>% filter(metabolite == "1H-indole-7-acetic acid"))
 (asv_andro <- tot %>% filter(metabolite == "5alpha-androstan-3beta,17alpha-diol disulfate"))
 (asv_entero <- tot %>% filter(metabolite == "enterolactone sulfate"))
@@ -167,13 +173,18 @@ tot %>% filter(superpathway != "Xenobiotics") %>% dplyr::select(metabolite, Tax,
 summary(asv_tyr$ASV %in% asv_urso$ASV)
 summary(asv_urso$ASV %in% asv_tyr$ASV)
 
-tot %>% filter(metabolite == "cinnamoylglycine") %>% select(metabolite, rho, padj, Tax, subpathway)
-tot %>% filter(metabolite == "3-phenylpropionate (hydrocinnamate)") %>% select(metabolite, rho, padj, Tax, subpathway)
-tot %>% filter(metabolite == "enterolactone sulfate") %>% select(metabolite, rho, padj, Tax, subpathway)
-tot %>% filter(metabolite == "4-hydroxycoumarin") %>% select(metabolite, rho, padj, Tax, subpathway)
-tot %>% filter(metabolite == "3-methoxytyrosine") %>% select(metabolite, rho, padj, Tax, subpathway)
-tot %>% filter(metabolite == "1H-indole-7-acetic acid") %>% select(metabolite, rho, padj, Tax, subpathway)
-tot %>% filter(metabolite == "isoursodeoxycholate") %>% select(metabolite, rho, padj, Tax, subpathway)
+tot %>% filter(metabolite == "3-phenylpropionate (hydrocinnamate)") %>% dplyr::select(metabolite, rho, padj, Tax, subpathway, superpathway)
+tot %>% filter(metabolite == "cinnamoylglycine") %>% dplyr::select(metabolite, rho, padj, Tax, subpathway, superpathway)
+tot %>% filter(metabolite == "enterolactone sulfate") %>% dplyr::select(metabolite, rho, padj, Tax, subpathway)
+tot %>% filter(metabolite == "3-methoxytyrosine") %>% dplyr::select(metabolite, rho, padj, Tax, subpathway)
+tot %>% filter(metabolite == "1H-indole-7-acetic acid") %>% dplyr::select(metabolite, rho, padj, Tax, subpathway)
+tot %>% filter(metabolite == "isoursodeoxycholate") %>% dplyr::select(metabolite, rho, padj, Tax, subpathway)
+tot %>% filter(metabolite == "glucuronate") %>% dplyr::select(metabolite, rho, padj, Tax, subpathway)
+tot %>% filter(metabolite == "4-hydroxycoumarin") %>% dplyr::select(metabolite, rho, padj, Tax, subpathway)
+
+tot %>% group_by(metabolite) %>% summarise(n = nlevels(as.factor(ASV))) %>% arrange(-n)
+tot %>% group_by(ASV) %>% summarise(n = nlevels(as.factor(metabolite))) %>% arrange(-n)
+tot %>% group_by(subpathway) %>% summarise(n = nlevels(as.factor(ASV))) %>% arrange(-n)
 
 totsel <- tot %>% arrange(pval) %>% slice(1:25)
 plotlist3 <- c()
