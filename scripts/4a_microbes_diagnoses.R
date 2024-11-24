@@ -2,9 +2,7 @@
 
 library(rio)
 library(phyloseq)
-library(haven)
 library(tidyverse)
-library(tableone)
 library(ggsci)
 library(broom)
 library(patchwork)
@@ -124,7 +122,14 @@ dim(ht)
 dim(metsyn)
 
 summary(as.factor(dm$Family))
+summary(as.factor(metsyn$Family))
 summary(as.factor(ht$Family))
+dm %>% filter(OR > 1)
+ht %>% filter(OR > 1)
+ht %>% filter(OR < 1)
+metsyn %>% filter(OR > 1)
+summary(metsyn$ASV %in% dm$ASV)
+summary(dm$ASV %in% metsyn$ASV)
 
 coltab <- NULL
 pal <- colorRampPalette(ggsci::pal_bmj()(9))
@@ -214,13 +219,13 @@ write.csv(ht, "results/hypertensionassociations.csv")
     plot_layout(widths = c(0.1, -0.1, 0.7), axis_titles = "collect_y"))
 
 dmplot / msplot / htplot +
-    plot_layout(guides = "collect", nrow = 3, heights = c(0.45, 1.0, 1.1)) +
+    plot_layout(guides = "collect", nrow = 3, heights = c(0.5, 1.0, 1.1)) +
     plot_annotation(tag_levels = list(c("A", "", "B", "", "C", ""))) &
     theme(plot.tag = element_text(face = "bold"),
           legend.key.size= unit(0.4, "cm"),
           legend.text = element_text(size = rel(1.0)))
 
-ggsave("results/diagnosispred_long.pdf", width = 14, height = 26)
+ggsave("results/microbiome_diagnoses/diagnosispred_long.pdf", width = 14, height = 27)
 
 #### Adjustment for PPI ####
 #### Associations with new diagnoses ####

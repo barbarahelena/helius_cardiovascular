@@ -170,6 +170,7 @@ df_new2 <- df_new %>%
                             right = FALSE)
     ) %>%
     droplevels(.)
+
 dim(df_new2)
 
 # Pivot longer clinical data
@@ -192,7 +193,9 @@ df_new_long <- df_new_long %>%
 
 # Get delta variables
 df_wide <- pivot_wider(df_new_long, id_cols = c(1:6), names_from = "timepoint",
-                       values_from = c(8:ncol(df_new_long)))
+                       values_from = c(7:ncol(df_new_long))) %>% 
+    filter(AB_baseline == "No") %>% 
+    droplevels(.)
 df_wide <- df_wide[,colSums(is.na(df_wide))<nrow(df_wide)]
 
 deltafactor <- function(x,y){
@@ -230,15 +233,10 @@ df_wide_delta <- df_wide %>%
 
 coldouble <- colnames(df_wide_delta)[which(str_detect(colnames(df_wide_delta), "_follow-up") | 
                                                str_detect(colnames(df_wide_delta), "_baseline"))]
-coldouble <- coldouble[c(1:2, 5:length(coldouble))]
+coldouble <- coldouble[c(3:length(coldouble))]
 df_long <- df_wide_delta %>% 
     pivot_longer(., cols = all_of(coldouble), names_to = c(".value", "timepoint"),
-                                        names_pattern = "(.*)_([a-z-]+)$")
-
-## Save files
-saveRDS(df_wide_delta, file = "data/clinicaldata_wide.RDS")
-saveRDS(df_long, file = "data/clinicaldata_long.RDS")
-
+                                        names_pattern = "(.*)_([a-z-]+)$") 
 
 #### 16S ####
 # Clean phyloseq object
@@ -246,15 +244,31 @@ tax <- readRDS("data/16s/phyloseq/rarefied/taxtable_rarefied.RDS")
 head(tax)
 notbacteria <- tax %>% filter(Kingdom != "Bacteria")
 tax2 <- tax %>% filter(Kingdom == "Bacteria") %>% 
-    mutate(Tax = case_when(str_starts(Tax, "UCG") | str_starts(Tax, "NK") | str_starts(Tax, "GCA") ~ str_c(Family, " ", Tax),
+    mutate(Tax = case_when((str_starts(Tax, "UCG") | str_starts(Tax, "NK") | 
+                               str_starts(Tax, "GCA")) & Family != "UCG-010" ~ str_c(Family, " ", Tax),
+                           Tax == "Incertae Sedis spp." ~ str_c(Family, " spp."),
+                           (str_starts(Tax, "UCG") | str_starts(Tax, "NK") | 
+                               str_starts(Tax, "GCA")) & Family == "UCG-010" ~ str_c(Order, " ", Tax),
                            .default = Tax))
-saveRDS(tax2, "data/taxtable_rarefied_cleaned.RDS")
 
 mbtot <- readRDS("data/16S/phyloseq/rarefied/phyloseq_rarefied.RDS")
 sample_names(mbtot) <- str_remove(sample_names(mbtot), "_T1")
 mbtot <- prune_taxa(!taxa_names(mbtot) %in% notbacteria$ASV, mbtot)
 mb <- prune_samples(sample_names(mbtot) %in% df_wide$sampleID_baseline, mbtot)
+mb <- prune_taxa(taxa_sums(mb) > 0, mb)
 saveRDS(mb, "data/phyloseq_rarefied_cleaned.RDS")
+
+tax2 <- tax2 %>% filter(ASV %in% taxa_names(mb))
+saveRDS(tax2, "data/taxtable_rarefied_cleaned.RDS")
+
+mbids <- str_c("S", str_remove(str_remove(sample_names(mb), "HELIBA_"), "HELIFU_"))
+
+df_wide_delta <- df_wide_delta %>% filter(ID %in% mbids)
+df_long <- df_long %>% filter(ID %in% mbids)
+
+## Save files
+saveRDS(df_wide_delta, file = "data/clinicaldata_wide.RDS")
+saveRDS(df_long, file = "data/clinicaldata_long.RDS")
 
 # Make baseline mb set for CBS enviroment
 cbs_ids <- rio::import("data/240411_HELIUS data Barbara Verhaar_Heliusnrs.csv") %>% 
