@@ -1,7 +1,6 @@
 ## Associations metabolomics and microbes
 
 library(rio)
-library(haven)
 library(tidyverse)
 library(tableone)
 library(ggsci)
@@ -43,12 +42,6 @@ theme_Publication <- function(base_size=12, base_family="sans") {
 } 
 
 
-
-
-
-
-
-
 ############### Associations with microbes ##################
 selection <- rio::import("data/ASVs_CBS.xlsx", header = FALSE)
 met <- readRDS("data/metabolomics/metabolomics_paired.RDS")
@@ -57,12 +50,12 @@ metsel <- as.data.frame(metsel)
 metsel <- metsel %>% dplyr::select(!starts_with("X-"))
 metsel <- metsel %>% mutate(across(everything(.), ~log10(.x+1)),
                             ID = rownames(.))
-mb <- readRDS("data/16S/phyloseq/rarefied/phyloseq_rarefied.RDS")
+mb <- readRDS("data/phyloseq_rarefied_cleaned.RDS")
 sample_names(mb) <- str_remove(sample_names(mb),"_T1")
 mb <- prune_samples(str_detect(sample_names(mb), "HELIBA"), mb)
 mb <- prune_samples(sample_names(mb) %in% rownames(metsel), mb)
 mb <- prune_taxa(selection$...1, mb)
-tax <- readRDS("data/16s/phyloseq/rarefied/taxtable_rarefied.RDS")
+tax <- readRDS("data/taxtable_rarefied_cleaned.RDS")
 
 mb <- as.data.frame(t(as(mb@otu_table, "matrix")))
 head(mb)
@@ -73,17 +66,16 @@ mbsel$ID <- rownames(mbsel)
 
 mbmet <- left_join(mbsel, metsel, by = "ID")
 dim(mbmet)
-
 names(mbmet)[1:13]
 res <- c()
 mbmet$asv <- NULL
 mbmet$met <- NULL
 plothist <- c()
-for(a in 1:13) {
+for(a in 1:17) {
     mbmet$asv <- mbmet[[a]]
     asvname <- names(mbmet)[a]
     plothist[[asvname]] <- gghistogram(mbmet$asv) + labs(x = asvname)
-    for(b in 15:(ncol(mbmet) -1)) {
+    for(b in 19:(ncol(mbmet) -1)) {
         mbmet$met <- mbmet[[b]]
         metname <- names(mbmet)[b]
         cor <- cor.test(mbmet$asv, y = mbmet$met, method = "spearman")
@@ -95,8 +87,8 @@ for(a in 1:13) {
     mbmet$asv <- NULL
 }
 
-ggarrange(plotlist = plothist, nrow = 4, ncol = 4, 
-          labels = c(LETTERS[1:13]))
+ggarrange(plotlist = plothist, nrow = 4, ncol = 5, 
+          labels = c(LETTERS[1:17]))
 ggsave("results/asv_distribution.pdf", width = 12, height = 26)
 
 res <- as.data.frame(res)
@@ -154,8 +146,8 @@ for(a in 1:nrow(reswide_rho)){
 }
 
 
-ggarrange(plotlist = plotlist[1:9], nrow = 3, ncol = 3, labels = LETTERS[1:9], common.legend = TRUE, legend = "bottom")
-ggsave("results/volcano_correlations.pdf", width = 20, height = 20)
+ggarrange(plotlist = plotlist[1:12], nrow = 4, ncol = 3, labels = LETTERS[1:12], common.legend = TRUE, legend = "bottom")
+ggsave("results/volcano_correlations.pdf", width = 20, height = 24)
 
 infofile <- rio::import("data/metabolomics/Info_HELIUS_metabolomics.xlsx") %>% 
     dplyr::select(metabolite = CHEMICAL_NAME, superpathway = SUPER_PATHWAY, subpathway = SUB_PATHWAY)
@@ -169,7 +161,6 @@ tot %>% filter(superpathway != "Xenobiotics") %>% dplyr::select(metabolite, Tax,
 
 (asv_indole <- tot %>% filter(metabolite == "1H-indole-7-acetic acid"))
 (asv_andro <- tot %>% filter(metabolite == "5alpha-androstan-3beta,17alpha-diol disulfate"))
-summary(asv_tyr$ASV %in% asv_andro$ASV)
 (asv_entero <- tot %>% filter(metabolite == "enterolactone sulfate"))
 (asv_tyr <- tot %>% filter(metabolite == "3-methoxytyrosine"))
 (asv_urso <- tot %>% filter(metabolite == "isoursodeoxycholate"))
