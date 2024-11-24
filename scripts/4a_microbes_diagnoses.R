@@ -140,10 +140,10 @@ families <- c("Akkermansiaceae", "Anaerovoracaceae", "Bacteroidaceae", "Bifidoba
               ) # to make colors in line with the registry analyses
 coltab <- setNames(pal(length(families)), families)
 families2 <- c("UCG-010", "Eggerthellaceae", "[Eubacterium] coprostanoligenes group", "Butyricicoccaceae",
-               "Sutterellaceae", "Streptococcaceae", "Unknown") # not occuring in registry analyses
+               "Sutterellaceae", "Streptococcaceae", "Erysipelotrichaceae", "Unknown") # not occuring in registry analyses
 famtot <- c(families, families2)
 pal2 <- colorRampPalette(ggsci::pal_futurama()(8)[c(1,3,4,7,8)])
-coltab2 <- setNames(c(pal2(length(families2)-1), "grey80"), families2)
+coltab2 <- setNames(c(pal2(length(families2)-2), "yellow1", "grey80"), families2)
 coltab <- coltab[which((names(coltab) %in% c(dm$Family, ht$Family, metsyn$Family)))]
 coltab <- c(coltab, coltab2)
 
