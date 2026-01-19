@@ -61,7 +61,7 @@ mb <- as.data.frame(t(as(mb@otu_table, "matrix")))
 head(mb)
 mbsel <- mb[, selection$...1]
 # colnames(mbsel) <- make.unique(tax$Tax[match(colnames(mbsel), tax$ASV)])
-mbsel <- mbsel %>% mutate(across(everything(.), ~log10(.x+1)))
+mbsel <- mbsel %>% mutate(across(everything(.), ~clr(.x+0.5)))
 mbsel$ID <- rownames(mbsel)
 
 mbmet <- left_join(mbsel, metsel, by = "ID")

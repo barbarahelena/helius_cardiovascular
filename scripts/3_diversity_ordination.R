@@ -6,6 +6,8 @@ library(tidyverse)
 library(phyloseq)
 library(mixOmics)
 library(vegan)
+library(ggsci)
+library(ggpubr)
 
 theme_Publication <- function(base_size=14, base_family="sans") {
     library(grid)
@@ -74,67 +76,67 @@ dftot <- dffai %>%
     mutate(
         DM_new = fct_recode(DM_new, "No diabetes" = "No", "New-onset diabetes" = "Yes"),
         HT_new = fct_recode(HT_new, "No hypertension" = "No", "New-onset hypertension" = "Yes"),
-        MetSyn_new = fct_recode(MetSyn_new, "No MetSyn" = "No", "New-onset MetSyn" = "Yes")
+        Dyslip_new = fct_recode(Dyslip_new, "No dyslipidemia" = "No", "New-onset dyslipidemia" = "Yes")
     )
 
 #### Baseline alpha diversity ####
 (shanpl1 <- ggplot(data = dftot %>% filter(!is.na(DM_new)), aes(x = DM_new, y = shannon)) +
-                geom_violin(aes(alpha = DM_new), fill = pal_bmj()(3)[1], show.legend = FALSE) +
+                geom_violin(aes(alpha = DM_new), fill = pal_bmj()(7)[7], show.legend = FALSE) +
                 scale_alpha_manual(values = c(0.4, 1.0)) +
                 geom_boxplot(fill = "white", width = 0.2) +
-                labs(y = "Shannon index", x = "", alpha = "", fill = "") +
+                labs(y = "Shannon index", x = "", alpha = "") +
                 stat_compare_means(comparisons = list(c("No diabetes", "New-onset diabetes")),
                                    tip.length = 0, hide.ns = TRUE,
                                    label = "p.signif", method = "wilcox.test") +
                 theme_Publication() + 
      theme(axis.text.x = element_text(hjust = 1, angle = 30)))
 (richpl1 <- ggplot(data = dftot %>% filter(!is.na(DM_new)), aes(x = DM_new, y = richness)) +
-        geom_violin(aes(alpha = DM_new), fill = pal_bmj()(3)[1], show.legend = FALSE) +
+        geom_violin(aes(alpha = DM_new), fill = pal_bmj()(7)[7], show.legend = FALSE) +
         scale_alpha_manual(values = c(0.4, 1.0)) +
         geom_boxplot(fill = "white", width = 0.2) +
-        labs(y = "Richness", x = "", alpha = "", fill = "") +
+        labs(y = "Richness", x = "", alpha = "") +
         stat_compare_means(comparisons = list(c("No diabetes", "New-onset diabetes")),
                            tip.length = 0, hide.ns = TRUE,
                            label = "p.signif", method = "wilcox.test") +
         theme_Publication() + 
         theme(axis.text.x = element_text(hjust = 1, angle = 30)))
 (pdpl1 <- ggplot(data = dftot %>% filter(!is.na(DM_new)), aes(x = DM_new, y = PD)) +
-        geom_violin(aes(alpha = DM_new), fill = pal_bmj()(3)[1], show.legend = FALSE) +
+        geom_violin(aes(alpha = DM_new), fill = pal_bmj()(7)[7], show.legend = FALSE) +
         scale_alpha_manual(values = c(0.4, 1.0)) +
         geom_boxplot(fill = "white", width = 0.2) +
-        labs(y = "Faith's phylogenetic diversity", x = "", alpha = "", fill = "") +
+        labs(y = "Faith's phylogenetic diversity", x = "", alpha = "") +
         stat_compare_means(comparisons = list(c("No diabetes", "New-onset diabetes")),
                            tip.length = 0, hide.ns = TRUE,
                            label = "p.signif", method = "wilcox.test") +
         theme_Publication() + 
         theme(axis.text.x = element_text(hjust = 1, angle = 30)))
 
-(shanpl2 <- ggplot(data = dftot %>% filter(!is.na(MetSyn_new)), aes(x = MetSyn_new, y = shannon)) +
-        geom_violin(aes(alpha = MetSyn_new), fill = pal_bmj()(4)[4], show.legend = FALSE) +
+(shanpl2 <- ggplot(data = dftot %>% filter(!is.na(Dyslip_new)), aes(x = Dyslip_new, y = shannon)) +
+        geom_violin(aes(alpha = Dyslip_new), fill = pal_bmj()(4)[4], show.legend = FALSE) +
         scale_alpha_manual(values = c(0.4, 1.0)) +
         geom_boxplot(fill = "white", width = 0.2) +
-        labs(y = "Shannon index", x = "", alpha = "", fill = "") +
-        stat_compare_means(comparisons = list(c("No MetSyn", "New-onset MetSyn")),
+        labs(y = "Shannon index", x = "", alpha = "") +
+        stat_compare_means(comparisons = list(c("No dyslipidemia", "New-onset dyslipidemia")),
                            tip.length = 0, hide.ns = TRUE,
                            label = "p.signif", method = "wilcox.test") +
         theme_Publication() + 
         theme(axis.text.x = element_text(hjust = 1, angle = 30)))
-(richpl2 <- ggplot(data = dftot %>% filter(!is.na(MetSyn_new)), aes(x = MetSyn_new, y = richness)) +
-        geom_violin(aes(alpha = MetSyn_new), fill = pal_bmj()(4)[4], show.legend = FALSE) +
+(richpl2 <- ggplot(data = dftot %>% filter(!is.na(Dyslip_new)), aes(x = Dyslip_new, y = richness)) +
+        geom_violin(aes(alpha = Dyslip_new), fill = pal_bmj()(4)[4], show.legend = FALSE) +
         scale_alpha_manual(values = c(0.4, 1.0)) +
         geom_boxplot(fill = "white", width = 0.2) +
         labs(y = "Richness", x = "", alpha = "", fill = "") +
-        stat_compare_means(comparisons = list(c("No MetSyn", "New-onset MetSyn")),
+        stat_compare_means(comparisons = list(c("No dyslipidemia", "New-onset dyslipidemia")),
                            tip.length = 0, hide.ns = TRUE,
                            label = "p.signif", method = "wilcox.test") +
         theme_Publication() + 
         theme(axis.text.x = element_text(hjust = 1, angle = 30)))
-(pdpl2 <- ggplot(data = dftot %>% filter(!is.na(MetSyn_new)), aes(x = MetSyn_new, y = PD)) +
-        geom_violin(aes(alpha = MetSyn_new), fill = pal_bmj()(4)[4], show.legend = FALSE) +
+(pdpl2 <- ggplot(data = dftot %>% filter(!is.na(Dyslip_new)), aes(x = Dyslip_new, y = PD)) +
+        geom_violin(aes(alpha = Dyslip_new), fill = pal_bmj()(4)[4], show.legend = FALSE) +
         scale_alpha_manual(values = c(0.4, 1.0)) +
         geom_boxplot(fill = "white", width = 0.2) +
         labs(y = "Faith's phylogenetic diversity", x = "", alpha = "", fill = "") +
-        stat_compare_means(comparisons = list(c("No MetSyn", "New-onset MetSyn")),
+        stat_compare_means(comparisons = list(c("No dyslipidemia", "New-onset dyslipidemia")),
                            tip.length = 0, hide.ns = TRUE,
                            label = "p.signif", method = "wilcox.test") +
         theme_Publication() + 
@@ -202,15 +204,15 @@ all(dfdm$sampleID_baseline == attributes(braydm)[["Labels"]]) # TRUE
 
 resdm <- adonis2(braydm ~ DM_new, data = dfdm) # PERMANOVA
 
-#### MetSyn ####
-dfms <- df_new %>% filter(!is.na(MetSyn_new))
+#### Dyslipidemia ####
+dfms <- df_new %>% filter(!is.na(Dyslip_new))
 phyms <- prune_samples(sample_names(phydata) %in% dfms$sampleID_baseline, phydata)
 tabms <- as.data.frame(t(as(phyms@otu_table, 'matrix')))
 
 brayms <- vegan::vegdist(tabms, method = 'bray') # takes about 5-10 min
 pcoordms <- ape::pcoa(brayms, correction = "cailliez") # takes about 15 min
 expl_variance_brayms <- pcoordms$values$Rel_corr_eig * 100
-write_lines(expl_variance_brayms, "results/ordination/expl_var_bray_ms.csv")
+write_lines(expl_variance_brayms, "results/ordination/expl_var_bray_dys.csv")
 
 dbray <- pcoordms$vectors[, c('Axis.1', 'Axis.2')]
 dbray <- as.data.frame(dbray)
@@ -221,7 +223,7 @@ dfms <- dfms %>% filter(sampleID_baseline %in% attributes(brayms)[["Labels"]])
 dfms <- dfms[order(match(dfms$sampleID_baseline, attributes(brayms)[["Labels"]])),]
 all(dfms$sampleID_baseline == attributes(brayms)[["Labels"]]) # TRUE
 
-resms <- adonis2(brayms ~ MetSyn_new, data = dfms) # PERMANOVA
+resms <- adonis2(brayms ~ Dyslip_new, data = dfms) # PERMANOVA
 
 #### Hypertension ####
 dfht <- df_new %>% filter(!is.na(HT_new))
@@ -255,8 +257,8 @@ resht <- adonis2(brayht ~ HT_new, data = dfht) # PERMANOVA
      ggtitle("New-onset diabetes") +
      xlab(paste0('PCo1 (', round(expl_variance_braydm[1], digits = 1),'%)')) +
      ylab(paste0('PCo2 (', round(expl_variance_braydm[2], digits = 1),'%)')) +
-     scale_color_manual(values = c("grey80", pal_bmj()(1))) +
-     scale_fill_manual(values = c("grey80", pal_bmj()(1)), guide = "none") +
+     scale_color_manual(values = c("grey80", pal_bmj()(7)[7])) +
+     scale_fill_manual(values = c("grey80", pal_bmj()(7)[7]), guide = "none") +
      scale_alpha_manual(guide = "none") +
      theme_Publication() +
      labs(color = "", alpha = "") +
@@ -266,12 +268,12 @@ resht <- adonis2(brayht ~ HT_new, data = dfht) # PERMANOVA
      ))
 
 (brayplotms <- bray_ms %>%
-        mutate(MetSyn_new = fct_recode(MetSyn_new, "No MetSyn" = "No", "New-onset MetSyn" = "Yes")) %>% 
+        mutate(Dyslip_new = fct_recode(Dyslip_new, "No dyslipidemia" = "No", "New-onset dyslipidemia" = "Yes")) %>% 
         ggplot(aes(BrayPCo1, BrayPCo2)) +
-        stat_ellipse(geom = "polygon", aes(color = MetSyn_new, fill = MetSyn_new), type = "norm",
+        stat_ellipse(geom = "polygon", aes(color = Dyslip_new, fill = Dyslip_new), type = "norm",
                      alpha = 0.1) +
-        geom_point(aes(color = MetSyn_new), size = 1, alpha = 0.7) +
-        ggtitle("New-onset MetSyn") +
+        geom_point(aes(color = Dyslip_new), size = 1, alpha = 0.7) +
+        ggtitle("New-onset dyslipidemia") +
         xlab(paste0('PCo1 (', round(expl_variance_brayms[1], digits = 1),'%)')) +
         ylab(paste0('PCo2 (', round(expl_variance_brayms[2], digits = 1),'%)')) +
         scale_color_manual(values = c("grey80", pal_bmj()(4)[4])) +
@@ -315,7 +317,7 @@ ggsave("results/diversityplots_diagnoses.pdf", width = 12, height = 14)
 dftot <- dftot %>% filter(EthnicityTot != "Other") %>% droplevels(.) %>% filter(!is.na(EthnicityTot))
 
 (shaneth1 <- ggplot(data = dftot %>% filter(!is.na(DM_new)), aes(x = DM_new, y = shannon)) +
-        geom_violin(aes(alpha = DM_new), fill = pal_bmj()(3)[1], show.legend = FALSE) +
+        geom_violin(aes(alpha = DM_new), fill = pal_bmj()(7)[7], show.legend = FALSE) +
         scale_alpha_manual(values = c(0.4, 1.0)) +
         geom_boxplot(fill = "white", width = 0.2) +
         labs(y = "Shannon index", x = "", alpha = "", fill = "") +
@@ -325,8 +327,8 @@ dftot <- dftot %>% filter(EthnicityTot != "Other") %>% droplevels(.) %>% filter(
         theme_Publication() +
         theme(axis.text.x = element_text(hjust = 1, angle = 45)))
 
-(shaneth2 <- ggplot(data = dftot %>% filter(!is.na(MetSyn_new)), aes(x = MetSyn_new, y = shannon)) +
-        geom_violin(aes(alpha = MetSyn_new), fill = pal_bmj()(3)[2], show.legend = FALSE) +
+(shaneth2 <- ggplot(data = dftot %>% filter(!is.na(Dyslip_new)), aes(x = Dyslip_new, y = shannon)) +
+        geom_violin(aes(alpha = Dyslip_new), fill = pal_bmj()(4)[4], show.legend = FALSE) +
         scale_alpha_manual(values = c(0.4, 1.0)) +
         geom_boxplot(fill = "white", width = 0.2) +
         labs(y = "Shannon index", x = "", alpha = "", fill = "") +

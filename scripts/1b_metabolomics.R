@@ -83,6 +83,27 @@ infomet <- infomet %>% select(MetabolonID, sup = SUPER_PATHWAY, sub = SUB_PATHWA
 )
 saveRDS(infomet, "data/info_metabolites.RDS")
 
+#### Missings ####
+infomet <- readxl::read_xlsx('data/metabolomics/infofile_peakarea.xlsx')
+infomet <- infomet %>% select(MetabolonID = `...1`, sup = SUPER_PATHWAY, sub = SUB_PATHWAY,
+                              metname = CHEMICAL_NAME, platform = PLATFORM)
+mettable <- readxl::read_xlsx("data/metabolomics/Metabolon.HELIUS.PA.xlsx")
+mettable[mettable == 0] <- NA  # Convert 0s to NA
+mettable <- mettable %>% select(names(.)[which(names(.) %in% infomet$MetabolonID)])
+name_map <- setNames(infomet$metname, infomet$MetabolonID)
+colnames(mettable) <- name_map[colnames(mettable)]
+print(colnames(mettable))
+mettable <- mettable %>% select(-contains("X-"))
+mettable <- mettable %>% select(names(.)[which(names(.) %in% colnames(metmatrix))])
 
+# Count missing values per column
+missing_counts <- colSums(is.na(mettable))
 
+# Calculate missing percentage
+missing_percent <- colMeans(is.na(mettable)) * 100
 
+# Print results
+print(missing_counts)
+print(missing_percent)
+dim(mettable)
+missing_percent[which(missing_percent > 10)]

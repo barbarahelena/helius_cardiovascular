@@ -167,9 +167,16 @@ df_new2 <- df_new %>%
          AgeDecade_FU = cut(Age_FU, 
                             breaks = c(18, 40, 50, 78),
                             labels = paste(c(18, 40, 50), c(39, 49, 78), sep = "-"), 
-                            right = FALSE)
+                            right = FALSE),
+        Dyslipidemia_BA = case_when(MetSyn_HighTG_BA == "Yes" | MetSyn_LowHDL_BA == "Yes" ~ "Yes",
+                               MetSyn_HighTG_BA == "No" & MetSyn_LowHDL_BA == "No" ~ "No"),
+        Dyslipidemia_FU = case_when(MetSyn_HighTG_FU == "Yes" | MetSyn_LowHDL_FU == "Yes" ~ "Yes",
+                               MetSyn_HighTG_FU == "No" & MetSyn_LowHDL_FU == "No" ~ "No"),
+        CurrentSmoking_BA = case_when(Smoking_BA == "Yes" ~ "Yes", Smoking_BA == "Former smoking" | Smoking_BA == "Never" ~ "No"),
+        AlcBin_BA = case_when(AlcCons_BA == "high (men >14 gl/w, women >7 gl/wk)" ~ "Yes", AlcCons_BA != "high (men >14 gl/w, women >7 gl/wk)" ~ "No")
     ) %>%
-    droplevels(.)
+    droplevels(.) %>% 
+    filter(AB_BA != "Yes")
 
 dim(df_new2)
 
@@ -227,6 +234,7 @@ df_wide_delta <- df_wide %>%
         StrokeLoss_new = deltafactor(StrokeLoss_baseline, `StrokeLoss_follow-up`),
         IschStroke_new = deltafactor(IschStroke_baseline, `IschStroke_follow-up`),
         MetSyn_new = deltafactor(MetSyn_baseline, `MetSyn_follow-up`),
+        Dyslip_new = deltafactor(Dyslipidemia_baseline, `Dyslipidemia_follow-up`),
         CardInt_new = deltafactor(CardInt_baseline, `CardInt_follow-up`),
         LLD_new = deltafactor(LLD_baseline, `LLD_follow-up`)
         )
@@ -242,6 +250,7 @@ df_long <- df_wide_delta %>%
 # Clean phyloseq object
 tax <- readRDS("data/16s/phyloseq/rarefied/taxtable_rarefied.RDS")
 head(tax)
+dim(tax)
 notbacteria <- tax %>% filter(Kingdom != "Bacteria")
 tax2 <- tax %>% filter(Kingdom == "Bacteria") %>% 
     mutate(Tax = case_when((str_starts(Tax, "UCG") | str_starts(Tax, "NK") | 

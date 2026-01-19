@@ -6,6 +6,7 @@ library(tidyverse)
 library(ggsci)
 library(broom)
 library(patchwork)
+library(ggpubr)
 
 theme_Publication <- function(base_size=12, base_family="sans") {
     library(grid)
@@ -42,23 +43,31 @@ theme_Publication <- function(base_size=12, base_family="sans") {
 } 
 
 #### Data ####
-df <- readRDS("data/clinicaldata_wide.RDS") %>% filter(SampleAB_baseline == "No")
+df <- readRDS("data/clinicaldata_wide.RDS")
 mb <- readRDS("data/phyloseq_rarefied_cleaned.RDS")
 tax <- readRDS("data/taxtable_rarefied_cleaned.RDS")
 
 #### Preprocessing microbiome data ####
 mb <- as.data.frame(t(as(mb@otu_table, "matrix")))
+
+# CLR (Centered Log-Ratio) transformation BEFORE filtering
+# This preserves the compositional structure of the full dataset
+mb_clr <- as.data.frame(clr(mb + 0.5))  # Add pseudocount of 0.5 to handle zeros
+
+# Filter ASVs AFTER CLR transformation
 tk <- apply(mb, 2, function(x) sum(x > 5) > (0.2*length(x)))
-mb <- mb[,tk]
-head(mb)
-mb <- mb %>% mutate(across(everything(.), ~log10(.x+1)))
+mb_clr <- mb_clr[,tk]  # Apply same filtering to CLR-transformed data
+
+head(mb_clr)
+mb <- mb_clr
 mb$sampleID_baseline <- rownames(mb)
 mbclin <- left_join(mb, df, by = "sampleID_baseline")
 dim(mbclin)
 head(mbclin)[1:5,1:5]
 
 #### Diabetes associations ####
-dmpred <- read.csv("results/diabetesassociations.csv")
+dmpred <- read.csv("results/diabetesassociations_smoking_alcohol_bmi.csv") |> filter(model == "Adjusted for age") |> 
+    arrange(OR) |> mutate(Tax = fct_inorder(Tax))
 mbdm <- mb %>% dplyr::select(sampleID_baseline, dmpred$ASV)
 mbdmclin <- left_join(mbdm, df, by = "sampleID_baseline")
 dim(mbdmclin)
@@ -77,17 +86,18 @@ for(a in 2:(ncol(mbdm))) {
     asvname <- colnames(mbdmclin)[a]
     print(asvname)
     # run models for each diagnosis while excluding participants with baseline diagnoses
-    dm_men<- glm(DM_new ~ asv + Age_baseline, data = mbdmclin %>% 
+    dm_men<- glm(DM_new ~ asv + Age_baseline + Smoking_baseline + AlcCons_baseline + BMI_baseline, data = mbdmclin %>% 
                         filter(DM_baseline == "No" & Sex == "Male"), family = "binomial")
-    dm_women <- glm(DM_new ~ asv + Age_baseline, data = mbdmclin %>% 
+    dm_women <- glm(DM_new ~ asv + Age_baseline + Smoking_baseline + AlcCons_baseline + BMI_baseline, data = mbdmclin %>% 
                         filter(DM_baseline == "No" & Sex == "Female"), family = "binomial")
-    dm_ia <- glm(DM_new ~ asv + Age_baseline + asv*Sex, 
+    dm_ia <- glm(DM_new ~ asv + Age_baseline + Smoking_baseline + AlcCons_baseline + BMI_baseline+ asv*Sex, 
                  data = mbdmclin %>% filter(DM_baseline == "No"), family = "binomial")
 
     # extract estimates for variable sex
     dm_men <- tidy(dm_men, conf.int=TRUE, exponentiate = TRUE)[2,]
     dm_women <- tidy(dm_women, conf.int=TRUE, exponentiate = TRUE)[2,]
-    dm_int <- tidy(dm_ia)[5,]
+    dm_int <- tidy(dm_ia)[10,]
+    
     # define rows
     row1 <- c(asvname, "Men", dm_men$estimate, dm_men$conf.low, dm_men$conf.high, dm_men$p.value, "")
     row2 <- c(asvname, "Women", dm_women$estimate, dm_women$conf.low, dm_women$conf.high, dm_women$p.value, 
@@ -124,19 +134,19 @@ interactions <- dm %>% filter(Sex == "Women")
         geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.5, position = position_dodge(0.5)) +
         geom_point(position = position_dodge(0.5)) +
         scale_x_continuous(n.breaks = 6, limits = c(0.0, 4.5)) +
-        labs(title = "Diabetes", y = "", x = "OR per log10-increase ASV", color = "") +
+        labs(title = "Diabetes", y = "", x = "OR per CLR-increase in ASV", color = "") +
         theme_Publication() +
         theme(axis.text.y = element_text(face = ifelse(rev(interactions$interactionsig) == "sig", 
                                                        "bold", "plain"))))
-ggsave(pldm, filename = "results/diabetes_interactions_sex.pdf", width = 10, height = 12)
 
-#### MetSyn ####
-mspred <- read.csv("results/metsynassociationcs.csv")
+#### Dyslipidemia ####
+mspred <- read.csv("results/dyslipidemiaassociations_smoking_alcohol_bmi.csv") |> filter(model == "Adjusted for age") |> 
+    arrange(OR) |> mutate(Tax = fct_inorder(Tax))
 mbms <- mb %>% dplyr::select(sampleID_baseline, mspred$ASV)
 mbmsclin <- left_join(mbms, df, by = "sampleID_baseline")
 head(mbmsclin)[1:5,1:5]
 mbmsclin <- mbmsclin %>% 
-    mutate(across(c("DM_new", "HT_new", "MetSyn_new"), ~fct_recode(.x, "1" = "Yes", "0" = "No")))
+    mutate(across(c("DM_new", "HT_new", "Dyslip_new"), ~fct_recode(.x, "1" = "Yes", "0" = "No")))
 length(names(mbmsclin)[2:ncol(mbms)])
 dim(mspred)
 resms <- c()
@@ -145,17 +155,17 @@ for(a in 2:(ncol(mbms))) {
     asvname <- colnames(mbmsclin)[a]
     print(asvname)
     # run models for each diagnosis while excluding participants with baseline diagnoses
-    ms_men <- glm(MetSyn_new ~ asv + Age_baseline, data = mbmsclin %>% 
+    ms_men <- glm(Dyslip_new ~ asv + Age_baseline + Smoking_baseline + AlcCons_baseline + BMI_baseline, data = mbmsclin %>% 
                         filter(MetSyn_baseline == "No" & Sex == "Male"), family = "binomial")
-    ms_women <- glm(MetSyn_new ~ asv + Age_baseline, data = mbmsclin %>% 
+    ms_women <- glm(Dyslip_new ~ asv + Age_baseline + Smoking_baseline + AlcCons_baseline + BMI_baseline, data = mbmsclin %>% 
                       filter(MetSyn_baseline == "No" & Sex == "Female"), family = "binomial")
-    ms_int <- glm(MetSyn_new ~ asv + Age_baseline + asv*Sex, data = mbmsclin %>% 
+    ms_int <- glm(Dyslip_new ~ asv + Age_baseline + Smoking_baseline + AlcCons_baseline + BMI_baseline + asv*Sex, data = mbmsclin %>% 
                      filter(MetSyn_baseline == "No"), family = "binomial")
     
     # extract estimates for variable sex
     ms_men <- tidy(ms_men, conf.int=TRUE, exponentiate = TRUE)[2,]
     ms_women <- tidy(ms_women, conf.int=TRUE, exponentiate = TRUE)[2,]
-    ms_int <- tidy(ms_int)[5,]
+    ms_int <- tidy(ms_int)[10,]
     # define rows
     row1 <- c(asvname, "Men", ms_men$estimate, ms_men$conf.low, ms_men$conf.high, ms_men$p.value, "")
     row2 <- c(asvname, "Women", ms_women$estimate, ms_women$conf.low, ms_women$conf.high, ms_women$p.value, 
@@ -192,19 +202,20 @@ interactions <- ms %>% filter(Sex == "Women")
         geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.5, position = position_dodge(0.5)) +
         geom_point(position = position_dodge(0.5)) +
         scale_x_continuous(n.breaks = 6, limits = c(0.0, 4.5)) +
-        labs(title = "MetSyn", y = "", x = "OR per log10-increase ASV", color = "") +
+        labs(title = "Dyslipidemia", y = "", x = "OR per CLR-increase in ASV", color = "") +
         theme_Publication() +
         theme(axis.text.y = element_text(face = ifelse(rev(interactions$interactionsig) == "sig", 
                                                        "bold", "plain"))))
-ggsave(plms, filename = "results/metsyn_interactions_sex.pdf", width = 10, height = 20)
+# ggsave(plms, filename = "results/metsyn_interactions_sex.pdf", width = 10, height = 20)
 
 #### Hypertension ####
-htpred <- read.csv("results/hypertensionassociations.csv")
+htpred <- read.csv("results/hypertensionassociations_smoking_alcohol_bmi.csv") |> filter(model == "Adjusted for age") |> 
+    arrange(OR) |> mutate(Tax = fct_inorder(Tax))
 mbht <- mb %>% dplyr::select(sampleID_baseline, htpred$ASV)
 mbhtclin <- left_join(mbht, df, by = "sampleID_baseline")
 head(mbhtclin)[1:5,1:5]
 mbhtclin <- mbhtclin %>% 
-    mutate(across(c("DM_new", "HT_new", "MetSyn_new"), ~fct_recode(.x, "1" = "Yes", "0" = "No")))
+    mutate(across(c("DM_new", "HT_new", "Dyslip_new"), ~fct_recode(.x, "1" = "Yes", "0" = "No")))
 length(names(mbhtclin)[2:ncol(mbht)])
 dim(htpred)
 resht <- c()
@@ -213,11 +224,11 @@ for(a in 2:(ncol(mbht))) {
     asvname <- colnames(mbhtclin)[a]
     print(asvname)
     # run models for each diagnosis while excluding participants with baseline diagnoses
-    ht_men <- glm(HT_new ~ asv + Age_baseline, data = mbhtclin %>% 
+    ht_men <- glm(HT_new ~ asv + Age_baseline + Smoking_baseline + AlcCons_baseline + BMI_baseline, data = mbhtclin %>% 
                         filter(HT_BPMed_baseline == "No" & Sex == "Male"), family = "binomial")
-    ht_women <- glm(HT_new ~ asv + Age_baseline, data = mbhtclin %>% 
+    ht_women <- glm(HT_new ~ asv + Age_baseline + Smoking_baseline + AlcCons_baseline + BMI_baseline, data = mbhtclin %>% 
                       filter(HT_BPMed_baseline == "No" & Sex == "Female"), family = "binomial")
-    ht_int <- glm(HT_new ~ asv + Age_baseline + asv*Sex, data = mbhtclin %>% 
+    ht_int <- glm(HT_new ~ asv + Age_baseline + Smoking_baseline + AlcCons_baseline + BMI_baseline + asv*Sex, data = mbhtclin %>% 
                       filter(HT_BPMed_baseline == "No"), family = "binomial")
     
     # extract estimates for variable sex
@@ -260,8 +271,16 @@ interactions <- ht %>% filter(Sex == "Men")
         geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.5, position = position_dodge(0.5)) +
         geom_point(position = position_dodge(0.5)) +
         scale_x_continuous(n.breaks = 6, limits = c(0.0, 5)) +
-        labs(title = "Hypertension", y = "", x = "OR per log10-increase ASV", color = "") +
+        labs(title = "Hypertension", y = "", x = "OR per CLR-increase in ASV", color = "") +
         theme_Publication() +
         theme(axis.text.y = element_text(face = ifelse(rev(interactions$interactionsig) == "sig", 
                                                        "bold", "plain"))))
-ggsave(plht, filename = "results/hypertension_interactions_sex.pdf", width = 10, height = 28)
+# ggsave(plht, filename = "results/hypertension_interactions_sex.pdf", width = 10, height = 28)
+
+pldm / plms / plht +
+    plot_layout(guides = "collect", nrow = 3, heights = c(0.75, 0.25, 1.1)) +
+    plot_annotation(tag_levels = list(c("A","B","C"))) &
+    theme(plot.tag = element_text(face = "bold"),
+          legend.key.size= unit(0.4, "cm"),
+          legend.text = element_text(size = rel(1.0)))
+ggsave("results/diagnoses_interactions_sex.pdf", width = 12, height = 30)

@@ -6,6 +6,7 @@ library(tidyverse)
 library(ggsci)
 library(broom)
 library(patchwork)
+library(ggpubr)
 
 theme_Publication <- function(base_size=12, base_family="sans") {
     library(grid)
@@ -15,8 +16,8 @@ theme_Publication <- function(base_size=12, base_family="sans") {
                                           size = rel(0.8), hjust = 0.5),
                 #family = 'Helvetica'
                 text = element_text(),
-                panel.background = element_rect(colour = NA),
-                plot.background = element_rect(colour = NA),
+                panel.background = element_rect(colour = NA, fill = NA),
+                plot.background = element_rect(colour = NA, fill = NA),
                 panel.border = element_rect(colour = NA),
                 axis.title = element_text(face = "bold",size = rel(0.8)),
                 axis.title.y = element_text(angle=90,vjust =2),
@@ -42,30 +43,38 @@ theme_Publication <- function(base_size=12, base_family="sans") {
 } 
 
 #### Data ####
-df <- readRDS("data/clinicaldata_wide.RDS") %>% filter(SampleAB_baseline == "No")
+df <- readRDS("data/clinicaldata_wide.RDS")
 mb <- readRDS("data/phyloseq_rarefied_cleaned.RDS")
 tax <- readRDS("data/taxtable_rarefied_cleaned.RDS")
 
 #### Preprocessing microbiome data ####
 mb <- as.data.frame(t(as(mb@otu_table, "matrix")))
+
+# CLR (Centered Log-Ratio) transformation BEFORE filtering
+# This preserves the compositional structure of the full dataset
+mb_clr <- as.data.frame(clr(mb + 0.5))  # Add pseudocount of 0.5 to handle zeros
+
+# Filter ASVs AFTER CLR transformation
 tk <- apply(mb, 2, function(x) sum(x > 5) > (0.2*length(x)))
-mb <- mb[,tk]
-head(mb)
-mb <- mb %>% mutate(across(everything(.), ~log10(.x+1)))
+mb_clr <- mb_clr[,tk]  # Apply same filtering to CLR-transformed data
+
+head(mb_clr)
+mb <- mb_clr
 mb$sampleID_baseline <- rownames(mb)
 mbclin <- left_join(mb, df, by = "sampleID_baseline")
 dim(mbclin)
 head(mbclin)[1:5,1:5]
 
 #### Diabetes associations ####
-dmpred <- read.csv("results/diabetesassociations.csv")
+dmpred <- read.csv("results/diabetesassociations_smoking_alcohol_bmi.csv") |> filter(model == "Adjusted for age") |> 
+    arrange(OR) |> mutate(Tax = fct_inorder(Tax))
 mbdm <- mb %>% dplyr::select(sampleID_baseline, dmpred$ASV)
 mbdmclin <- left_join(mbdm, df, by = "sampleID_baseline")
 dim(mbdmclin)
 head(mbdmclin)[1:5,1:5]
 names(mbdmclin)[1:ncol(mbdmclin)]
 mbdmclin <- mbdmclin %>% mutate(
-    across(c("DM_new", "HT_new", "MetSyn_new"), ~fct_recode(.x, "1" = "Yes", "0" = "No"))
+    across(c("DM_new", "HT_new", "Dyslip_new"), ~fct_recode(.x, "1" = "Yes", "0" = "No"))
 )
 resdm <- c()
 length(names(mbdmclin)[2:ncol(mbdm)])
@@ -76,20 +85,20 @@ for(a in 2:(ncol(mbdm))) {
     asvname <- colnames(mbdmclin)[a]
     print(asvname)
     # run models for each diagnosis while excluding participants with baseline diagnoses
-    dm_dutch <- glm(DM_new ~ asv + Age_baseline, data = mbdmclin %>% 
+    dm_dutch <- glm(DM_new ~ asv + Age_baseline  + CurrentSmoking_baseline + AlcBin_baseline + BMI_baseline, data = mbdmclin %>% 
                         filter(DM_baseline == "No" & EthnicityTot == "Dutch"), family = "binomial")
-    dm_sas <- glm(DM_new ~ asv + Age_baseline, data = mbdmclin %>% 
+    dm_sas <- glm(DM_new ~ asv + Age_baseline + CurrentSmoking_baseline + AlcBin_baseline + BMI_baseline, data = mbdmclin %>% 
                         filter(DM_baseline == "No" & EthnicityTot == "South-Asian Surinamese"), family = "binomial")
-    dm_as <- glm(DM_new ~ asv + Age_baseline, data = mbdmclin %>% 
+    dm_as <- glm(DM_new ~ asv + Age_baseline + CurrentSmoking_baseline + AlcBin_baseline + BMI_baseline, data = mbdmclin %>% 
                       filter(DM_baseline == "No" & EthnicityTot == "African Surinamese"), family = "binomial")
-    dm_ia <- glm(DM_new ~ asv + Age_baseline + asv*EthnicityTot, data = mbdmclin %>% 
+    dm_ia <- glm(DM_new ~ asv + Age_baseline + CurrentSmoking_baseline + AlcBin_baseline + BMI_baseline + asv*EthnicityTot, data = mbdmclin %>% 
                      filter(DM_baseline == "No" & EthnicityTot %in% ethsel), family = "binomial")
 
     # extract estimates for variable sex
     dm_dutch <- tidy(dm_dutch, conf.int=TRUE, exponentiate = TRUE)[2,]
     dm_sas <- tidy(dm_sas, conf.int=TRUE, exponentiate = TRUE)[2,]
     dm_as <- tidy(dm_as, conf.int=TRUE, exponentiate = TRUE)[2,]
-    dm_int <- tidy(dm_ia)[6:7,]
+    dm_int <- tidy(dm_ia)[11:12,]
     # define rows
     row1 <- c(asvname, "Dutch", dm_dutch$estimate, dm_dutch$conf.low, dm_dutch$conf.high, dm_dutch$p.value, "")
     row2 <- c(asvname, "South-Asian Surinamese", dm_sas$estimate, dm_sas$conf.low, dm_sas$conf.high, dm_sas$p.value, dm_int$p.value[1])
@@ -127,17 +136,18 @@ interactions <- dm %>% filter(Ethnicity == "Dutch")
         geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.5, position = position_dodge(0.5)) +
         geom_point(position = position_dodge(0.5)) +
         scale_x_continuous(n.breaks = 6, limits = c(0.0, 4.5)) +
-        labs(title = "Diabetes", y = "", x = "OR per log10-increase ASV", color = "") +
+        labs(title = "Diabetes", y = "", x = "OR per CLR-increase in ASV", color = "") +
         theme_Publication() +
         theme(axis.text.y = element_text(face = ifelse(rev(interactions$interactionsig) == "sig", "bold", "plain"))))
-ggsave(pldm, filename = "results/diabetes_interactions.pdf", width = 10, height = 12)
+# ggsave(pldm, filename = "results/diabetes_interactions.pdf", width = 10, height = 12)
 
-#### MetSyn ####
-mspred <- read.csv("results/metsynassociationcs.csv")
+#### Dyslipidemia ####
+mspred <- read.csv("results/dyslipidemiaassociations_smoking_alcohol_bmi.csv") |> filter(model == "Adjusted for age") |> 
+    arrange(OR) |> mutate(Tax = fct_inorder(Tax))
 mbms <- mb %>% dplyr::select(sampleID_baseline, mspred$ASV)
 mbmsclin <- left_join(mbms, df, by = "sampleID_baseline")
 head(mbmsclin)[1:5,1:5]
-mbmsclin <- mbmsclin %>% mutate(across(c("DM_new", "HT_new", "MetSyn_new"), ~fct_recode(.x, "1" = "Yes", "0" = "No")))
+mbmsclin <- mbmsclin %>% mutate(across(c("DM_new", "HT_new", "Dyslip_new"), ~fct_recode(.x, "1" = "Yes", "0" = "No")))
 resms <- c()
 length(names(mbmsclin)[2:ncol(mbms)])
 dim(mspred)
@@ -147,20 +157,20 @@ for(a in 2:(ncol(mbms))) {
     asvname <- colnames(mbmsclin)[a]
     print(asvname)
     # run models for each diagnosis while excluding participants with baseline diagnoses
-    ms_dutch <- glm(MetSyn_new ~ asv + Age_baseline, data = mbmsclin %>% 
-                        filter(MetSyn_baseline == "No" & EthnicityTot == "Dutch"), family = "binomial")
-    ms_sas <- glm(MetSyn_new ~ asv + Age_baseline, data = mbmsclin %>% 
-                      filter(MetSyn_baseline == "No" & EthnicityTot == "South-Asian Surinamese"), family = "binomial")
-    ms_as <- glm(MetSyn_new ~ asv + Age_baseline, data = mbmsclin %>% 
-                     filter(MetSyn_baseline == "No" & EthnicityTot == "African Surinamese"), family = "binomial")
-    ms_int <- glm(MetSyn_new ~ asv + Age_baseline + asv*EthnicityTot, data = mbmsclin %>% 
-                     filter(MetSyn_baseline == "No" & EthnicityTot %in% ethsel), family = "binomial")
+    ms_dutch <- glm(Dyslip_new ~ asv + Age_baseline + CurrentSmoking_baseline + AlcBin_baseline + BMI_baseline, data = mbmsclin %>% 
+                        filter(Dyslipidemia_baseline == "No" & EthnicityTot == "Dutch"), family = "binomial")
+    ms_sas <- glm(Dyslip_new ~ asv + Age_baseline  + CurrentSmoking_baseline + AlcBin_baseline + BMI_baseline, data = mbmsclin %>% 
+                      filter(Dyslipidemia_baseline == "No" & EthnicityTot == "South-Asian Surinamese"), family = "binomial")
+    ms_as <- glm(Dyslip_new ~ asv + Age_baseline  + CurrentSmoking_baseline + AlcBin_baseline + BMI_baseline, data = mbmsclin %>% 
+                     filter(Dyslipidemia_baseline == "No" & EthnicityTot == "African Surinamese"), family = "binomial")
+    ms_int <- glm(Dyslip_new ~ asv + Age_baseline  + CurrentSmoking_baseline + AlcBin_baseline + BMI_baseline + asv*EthnicityTot, data = mbmsclin %>% 
+                     filter(Dyslipidemia_baseline == "No" & EthnicityTot %in% ethsel), family = "binomial")
     
     # extract estimates for variable sex
     ms_dutch <- tidy(ms_dutch, conf.int=TRUE, exponentiate = TRUE)[2,]
     ms_sas <- tidy(ms_sas, conf.int=TRUE, exponentiate = TRUE)[2,]
     ms_as <- tidy(ms_as, conf.int=TRUE, exponentiate = TRUE)[2,]
-    ms_int <- tidy(ms_int)[6:7,]
+    ms_int <- tidy(ms_int)[11:12,]
     # define rows
     row1 <- c(asvname, "Dutch", ms_dutch$estimate, ms_dutch$conf.low, ms_dutch$conf.high, ms_dutch$p.value, "")
     row2 <- c(asvname, "South-Asian Surinamese", ms_sas$estimate, ms_sas$conf.low, ms_sas$conf.high, ms_sas$p.value, ms_int$p.value[1])
@@ -198,17 +208,18 @@ interactions <- ms %>% filter(Ethnicity == "Dutch")
         geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.5, position = position_dodge(0.5)) +
         geom_point(position = position_dodge(0.5)) +
         scale_x_continuous(n.breaks = 6, limits = c(0.0, 4.5)) +
-        labs(title = "MetSyn", y = "", x = "OR per log10-increase ASV", color = "") +
+        labs(title = "Dyslipidemia", y = "", x = "OR per CLR-increase in ASV", color = "") +
         theme_Publication() +
         theme(axis.text.y = element_text(face = ifelse(rev(interactions$interactionsig) == "sig", "bold", "plain"))))
-ggsave(plms, filename = "results/metsyn_interactions.pdf", width = 10, height = 20)
+# ggsave(plms, filename = "results/metsyn_interactions.pdf", width = 10, height = 20)
 
 #### Hypertension ####
-htpred <- read.csv("results/hypertensionassociations.csv")
+htpred <- read.csv("results/hypertensionassociations_smoking_alcohol_bmi.csv") |> filter(model == "Adjusted for age") |> 
+    arrange(OR) |> mutate(Tax = fct_inorder(Tax))
 mbht <- mb %>% dplyr::select(sampleID_baseline, htpred$ASV)
 mbhtclin <- left_join(mbht, df, by = "sampleID_baseline")
 head(mbhtclin)[1:5,1:5]
-mbhtclin <- mbhtclin %>% mutate(across(c("DM_new", "HT_new", "MetSyn_new"), ~fct_recode(.x, "1" = "Yes", "0" = "No")))
+mbhtclin <- mbhtclin %>% mutate(across(c("DM_new", "HT_new", "Dyslip_new"), ~fct_recode(.x, "1" = "Yes", "0" = "No")))
 resht <- c()
 length(names(mbhtclin)[2:ncol(mbht)])
 dim(htpred)
@@ -218,20 +229,20 @@ for(a in 2:(ncol(mbht))) {
     asvname <- colnames(mbhtclin)[a]
     print(asvname)
     # run models for each diagnosis while excluding participants with baseline diagnoses
-    ht_dutch <- glm(HT_new ~ asv + Age_baseline, data = mbhtclin %>% 
+    ht_dutch <- glm(HT_new ~ asv + Age_baseline + CurrentSmoking_baseline + AlcBin_baseline + BMI_baseline, data = mbhtclin %>% 
                         filter(HT_BPMed_baseline == "No" & EthnicityTot == "Dutch"), family = "binomial")
-    ht_sas <- glm(HT_new ~ asv + Age_baseline, data = mbhtclin %>% 
+    ht_sas <- glm(HT_new ~ asv + Age_baseline + CurrentSmoking_baseline + AlcBin_baseline + BMI_baseline, data = mbhtclin %>% 
                       filter(HT_BPMed_baseline == "No" & EthnicityTot == "South-Asian Surinamese"), family = "binomial")
-    ht_as <- glm(HT_new ~ asv + Age_baseline, data = mbhtclin %>% 
+    ht_as <- glm(HT_new ~ asv + Age_baseline + CurrentSmoking_baseline + AlcBin_baseline + BMI_baseline, data = mbhtclin %>% 
                      filter(HT_BPMed_baseline == "No" & EthnicityTot == "African Surinamese"), family = "binomial")
-    ht_int <- glm(HT_new ~ asv + Age_baseline + asv*EthnicityTot, data = mbhtclin %>% 
+    ht_int <- glm(HT_new ~ asv + Age_baseline + CurrentSmoking_baseline + AlcBin_baseline + BMI_baseline + asv*EthnicityTot, data = mbhtclin %>% 
                       filter(HT_BPMed_baseline == "No" & EthnicityTot %in% ethsel), family = "binomial")
     
     # extract estimates for variable sex
     ht_dutch <- tidy(ht_dutch, conf.int=TRUE, exponentiate = TRUE)[2,]
     ht_sas <- tidy(ht_sas, conf.int=TRUE, exponentiate = TRUE)[2,]
     ht_as <- tidy(ht_as, conf.int=TRUE, exponentiate = TRUE)[2,]
-    ht_int <- tidy(ht_int)[6:7,]
+    ht_int <- tidy(ht_int)[11:12,]
     # define rows
     row1 <- c(asvname, "Dutch", ht_dutch$estimate, ht_dutch$conf.low, ht_dutch$conf.high, ht_dutch$p.value, "")
     row2 <- c(asvname, "South-Asian Surinamese", ht_sas$estimate, ht_sas$conf.low, ht_sas$conf.high, ht_sas$p.value, ht_int$p.value[1])
@@ -270,7 +281,16 @@ interactions <- ht %>% filter(Ethnicity == "Dutch")
         geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.5, position = position_dodge(0.5)) +
         geom_point(position = position_dodge(0.5)) +
         scale_x_continuous(n.breaks = 6, limits = c(0.0, 5)) +
-        labs(title = "Hypertension", y = "", x = "OR per log10-increase ASV", color = "") +
+        labs(title = "Hypertension", y = "", x = "OR per CLR-increase in ASV", color = "") +
         theme_Publication() +
         theme(axis.text.y = element_text(face = ifelse(rev(interactions$interactionsig) == "sig", "bold", "plain"))))
-ggsave(plht, filename = "results/hypertension_interactions.pdf", width = 10, height = 28)
+# ggsave(plht, filename = "results/hypertension_interactions.pdf", width = 10, height = 28)
+
+pldm / plms / plht +
+    plot_layout(guides = "collect", nrow = 3, heights = c(0.75, 0.25, 1.1)) +
+    plot_annotation(tag_levels = list(c("A","B","C"))) &
+    theme(plot.tag = element_text(face = "bold"),
+          legend.key.size= unit(0.4, "cm"),
+          legend.text = element_text(size = rel(1.0)))
+ggsave("results/diagnoses_interactions_ethnicity.pdf", width = 12, height = 30)
+
