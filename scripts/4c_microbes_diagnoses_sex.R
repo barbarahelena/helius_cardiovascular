@@ -16,8 +16,8 @@ theme_Publication <- function(base_size=12, base_family="sans") {
                                           size = rel(0.8), hjust = 0.5),
                 #family = 'Helvetica'
                 text = element_text(),
-                panel.background = element_rect(colour = NA),
-                plot.background = element_rect(colour = NA),
+                panel.background = element_rect(colour = NA, fill = NA),
+                plot.background = element_rect(colour = NA, fill = NA),
                 panel.border = element_rect(colour = NA),
                 axis.title = element_text(face = "bold",size = rel(0.8)),
                 axis.title.y = element_text(angle=90,vjust =2),
@@ -86,17 +86,17 @@ for(a in 2:(ncol(mbdm))) {
     asvname <- colnames(mbdmclin)[a]
     print(asvname)
     # run models for each diagnosis while excluding participants with baseline diagnoses
-    dm_men<- glm(DM_new ~ asv + Age_baseline + Smoking_baseline + AlcCons_baseline + BMI_baseline, data = mbdmclin %>% 
+    dm_men<- glm(DM_new ~ asv + Age_baseline, data = mbdmclin %>% 
                         filter(DM_baseline == "No" & Sex == "Male"), family = "binomial")
-    dm_women <- glm(DM_new ~ asv + Age_baseline + Smoking_baseline + AlcCons_baseline + BMI_baseline, data = mbdmclin %>% 
+    dm_women <- glm(DM_new ~ asv + Age_baseline, data = mbdmclin %>% 
                         filter(DM_baseline == "No" & Sex == "Female"), family = "binomial")
-    dm_ia <- glm(DM_new ~ asv + Age_baseline + Smoking_baseline + AlcCons_baseline + BMI_baseline+ asv*Sex, 
+    dm_ia <- glm(DM_new ~ asv + Age_baseline + asv*Sex, 
                  data = mbdmclin %>% filter(DM_baseline == "No"), family = "binomial")
 
     # extract estimates for variable sex
     dm_men <- tidy(dm_men, conf.int=TRUE, exponentiate = TRUE)[2,]
     dm_women <- tidy(dm_women, conf.int=TRUE, exponentiate = TRUE)[2,]
-    dm_int <- tidy(dm_ia)[10,]
+    dm_int <- tidy(dm_ia)[5,]
     
     # define rows
     row1 <- c(asvname, "Men", dm_men$estimate, dm_men$conf.low, dm_men$conf.high, dm_men$p.value, "")
@@ -133,7 +133,7 @@ interactions <- dm %>% filter(Sex == "Women")
         scale_color_nejm() +
         geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.5, position = position_dodge(0.5)) +
         geom_point(position = position_dodge(0.5)) +
-        scale_x_continuous(n.breaks = 6, limits = c(0.0, 4.5)) +
+        scale_x_continuous(n.breaks = 6, limits = c(0.5, 1.75)) +
         labs(title = "Diabetes", y = "", x = "OR per CLR-increase in ASV", color = "") +
         theme_Publication() +
         theme(axis.text.y = element_text(face = ifelse(rev(interactions$interactionsig) == "sig", 
@@ -155,17 +155,17 @@ for(a in 2:(ncol(mbms))) {
     asvname <- colnames(mbmsclin)[a]
     print(asvname)
     # run models for each diagnosis while excluding participants with baseline diagnoses
-    ms_men <- glm(Dyslip_new ~ asv + Age_baseline + Smoking_baseline + AlcCons_baseline + BMI_baseline, data = mbmsclin %>% 
-                        filter(MetSyn_baseline == "No" & Sex == "Male"), family = "binomial")
+    ms_men <- glm(Dyslip_new ~ asv + Age_baseline, data = mbmsclin %>% 
+                        filter(Dyslipidemia_baseline == "No" & Sex == "Male"), family = "binomial")
     ms_women <- glm(Dyslip_new ~ asv + Age_baseline + Smoking_baseline + AlcCons_baseline + BMI_baseline, data = mbmsclin %>% 
-                      filter(MetSyn_baseline == "No" & Sex == "Female"), family = "binomial")
-    ms_int <- glm(Dyslip_new ~ asv + Age_baseline + Smoking_baseline + AlcCons_baseline + BMI_baseline + asv*Sex, data = mbmsclin %>% 
-                     filter(MetSyn_baseline == "No"), family = "binomial")
+                      filter(Dyslipidemia_baseline == "No" & Sex == "Female"), family = "binomial")
+    ms_int <- glm(Dyslip_new ~ asv + Age_baseline + asv*Sex, data = mbmsclin %>% 
+                     filter(Dyslipidemia_baseline == "No"), family = "binomial")
     
     # extract estimates for variable sex
     ms_men <- tidy(ms_men, conf.int=TRUE, exponentiate = TRUE)[2,]
     ms_women <- tidy(ms_women, conf.int=TRUE, exponentiate = TRUE)[2,]
-    ms_int <- tidy(ms_int)[10,]
+    ms_int <- tidy(ms_int)[5,]
     # define rows
     row1 <- c(asvname, "Men", ms_men$estimate, ms_men$conf.low, ms_men$conf.high, ms_men$p.value, "")
     row2 <- c(asvname, "Women", ms_women$estimate, ms_women$conf.low, ms_women$conf.high, ms_women$p.value, 
@@ -201,7 +201,7 @@ interactions <- ms %>% filter(Sex == "Women")
         scale_color_nejm() +
         geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.5, position = position_dodge(0.5)) +
         geom_point(position = position_dodge(0.5)) +
-        scale_x_continuous(n.breaks = 6, limits = c(0.0, 4.5)) +
+        scale_x_continuous(n.breaks = 6, limits = c(0.5, 1.75)) +
         labs(title = "Dyslipidemia", y = "", x = "OR per CLR-increase in ASV", color = "") +
         theme_Publication() +
         theme(axis.text.y = element_text(face = ifelse(rev(interactions$interactionsig) == "sig", 
@@ -224,13 +224,13 @@ for(a in 2:(ncol(mbht))) {
     asvname <- colnames(mbhtclin)[a]
     print(asvname)
     # run models for each diagnosis while excluding participants with baseline diagnoses
-    ht_men <- glm(HT_new ~ asv + Age_baseline + Smoking_baseline + AlcCons_baseline + BMI_baseline, data = mbhtclin %>% 
+    ht_men <- glm(HT_new ~ asv + Age_baseline, data = mbhtclin %>% 
                         filter(HT_BPMed_baseline == "No" & Sex == "Male"), family = "binomial")
-    ht_women <- glm(HT_new ~ asv + Age_baseline + Smoking_baseline + AlcCons_baseline + BMI_baseline, data = mbhtclin %>% 
+    ht_women <- glm(HT_new ~ asv + Age_baseline, data = mbhtclin %>% 
                       filter(HT_BPMed_baseline == "No" & Sex == "Female"), family = "binomial")
-    ht_int <- glm(HT_new ~ asv + Age_baseline + Smoking_baseline + AlcCons_baseline + BMI_baseline + asv*Sex, data = mbhtclin %>% 
+    ht_int <- glm(HT_new ~ asv + Age_baseline + asv*Sex, data = mbhtclin %>% 
                       filter(HT_BPMed_baseline == "No"), family = "binomial")
-    
+    print(tidy(ht_int))
     # extract estimates for variable sex
     ht_men <- tidy(ht_men, conf.int=TRUE, exponentiate = TRUE)[2,]
     ht_women <- tidy(ht_women, conf.int=TRUE, exponentiate = TRUE)[2,]
@@ -270,7 +270,7 @@ interactions <- ht %>% filter(Sex == "Men")
         scale_color_nejm() +
         geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.5, position = position_dodge(0.5)) +
         geom_point(position = position_dodge(0.5)) +
-        scale_x_continuous(n.breaks = 6, limits = c(0.0, 5)) +
+        scale_x_continuous(n.breaks = 6, limits = c(0.5, 1.75)) +
         labs(title = "Hypertension", y = "", x = "OR per CLR-increase in ASV", color = "") +
         theme_Publication() +
         theme(axis.text.y = element_text(face = ifelse(rev(interactions$interactionsig) == "sig", 

@@ -12,6 +12,7 @@ library(tableone)
 ## Open HELIUS clinical data
 df <- haven::read_sav("data/240411_2_HELIUS data Barbara Verhaar -  Descriptives.sav")
 names(df)
+dim(df)
 str(df$H1_FecesMicrobiome)
 summary(as_factor(df$H1_FecesMicrobiome))
 
@@ -107,13 +108,14 @@ df_new2 <- df_new %>%
     droplevels(.)
 
 dim(df_new2)
+summary(as.factor(df_new2$AB_BA))
 
 ### Table total cohort with and without microbiome data ###
 table1 <- df_new2 %>%
     dplyr::select(Age_BA, Sex, EthnicityTot, , BMI_BA, Smoking_BA, AlcCons_BA, 
            DM_BA, SBP_BA, DBP_BA, HT_BPMed_BA, MetSyn_BA, 
            TC_BA, LDL_BA, Trig_BA, 
-           HbA1c_BA, SamplePresent) %>% 
+           HbA1c_BA, SamplePresent, AB_BA) %>% 
     CreateTableOne(data=., strata = c("SamplePresent"), test = TRUE) %>% 
     print(nonnormal=c("Trig"), noSpaces = TRUE, 
           pDigits = 3, contDigits = 1, missing = TRUE) %>% 
@@ -186,9 +188,6 @@ table1 <- df_new2 %>% filter(EthnicityTot == "Ghanaian") %>%
     as.data.frame(.)
 write.csv2(as.data.frame(table1), 'results/tables/table_totalcohort_ghanaian.csv')
 
-#### 16S ####
-df_new3 <- df_new2 |> filter(SamplePresent == "Yes")
-
 #### With and without follow-up ###
 table1 <- df_new3 %>%
       dplyr::select(Age_BA, Sex, BMI_BA, Smoking_BA, AlcCons_BA, 
@@ -196,7 +195,7 @@ table1 <- df_new3 %>%
            TC_BA, LDL_BA, Trig_BA, 
            HbA1c_BA, Microbiome) %>% 
     CreateTableOne(data=., strata = c("Microbiome"), test = TRUE) %>% 
-    print(nonnormal=c("Trig"), noSpaces = TRUE, 
+    print(nonnormal=c("Trig_BA"), noSpaces = TRUE, 
           pDigits = 3, contDigits = 1, missing = TRUE) %>% 
     as.data.frame(.)
 write.csv2(as.data.frame(table1), 'results/tables/table_withandwithoutfollowup.csv')

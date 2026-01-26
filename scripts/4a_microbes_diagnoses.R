@@ -79,6 +79,10 @@ names(mbclin)[1:ncol(mb)-1]
 mbclin <- mbclin %>% mutate(
     across(c("DM_new", "HT_new", "Dyslip_new"), ~fct_recode(.x, "1" = "Yes", "0" = "No"))
 )
+mbclin |> filter(DM_baseline == "Yes") |> nrow()
+mbclin |> filter(Dyslipidemia_baseline == "Yes") |> nrow()
+mbclin |> filter(HT_BPMed_baseline == "Yes") |> nrow()
+
 res <- c()
 for(a in 1:(ncol(mb)-1)) { # minus 1 because of sampleID_baseline var
     mbclin$asv <- mbclin[[a]]
@@ -175,7 +179,9 @@ dim(dyslipidemia)
 
 summary(as.factor(dm$Family))
 summary(as.factor(dyslipidemia$Family))
-summary(as.factor(ht$Family))
+htsel <- ht |> filter(model == "Adjusted for age, sex, BMI, smoking, alcohol") |> filter(padj < 0.05) |> filter(OR < 1)
+dim(htsel)
+summary(as.factor(htsel$Family))
 dm %>% filter(OR > 1)
 ht %>% filter(OR > 1)
 ht %>% filter(OR < 1)

@@ -17,8 +17,8 @@ theme_Publication <- function(base_size=14, base_family="sans") {
         + theme(plot.title = element_text(face = "bold",
                                           size = rel(1.0), hjust = 0.5),
                 text = element_text(),
-                panel.background = element_rect(colour = NA),
-                plot.background = element_rect(colour = NA),
+                panel.background = element_rect(colour = NA, fill = NA),
+                plot.background = element_rect(colour = NA, fill = NA),
                 panel.border = element_rect(colour = NA),
                 axis.title = element_text(face = "bold",size = rel(0.8)),
                 axis.title.y = element_text(angle=90, vjust =2),
@@ -262,9 +262,8 @@ resht <- adonis2(brayht ~ HT_new, data = dfht) # PERMANOVA
      scale_alpha_manual(guide = "none") +
      theme_Publication() +
      labs(color = "", alpha = "") +
-     annotate("text", x= Inf, y = Inf, hjust = 1, vjust = 1,
-              label = str_c("PERMANOVA: p = ", resdm$`Pr(>F)`, ", r2 = ", 
-                            format(round(resdm$R2[1],3), nsmall = 3))
+     annotate("text", x= Inf, y = Inf, hjust = 1, vjust = 1, size = 4.0,
+              label = str_c("PERMANOVA: R2 ", format(round(resdm$R2[1],3), nsmall = 3), ", p = ", resdm$`Pr(>F)`)
      ))
 
 (brayplotms <- bray_ms %>%
@@ -281,9 +280,8 @@ resht <- adonis2(brayht ~ HT_new, data = dfht) # PERMANOVA
         scale_alpha_manual(guide = "none") +
         theme_Publication() +
         labs(color = "", alpha = "") +
-        annotate("text", x= Inf, y = Inf, hjust = 1, vjust = 1,
-                 label = str_c("PERMANOVA: p = ", resms$`Pr(>F)`, ", r2 = ", 
-                               format(round(resms$R2[1],3), nsmall = 3))
+        annotate("text", x= Inf, y = Inf, hjust = 1, vjust = 1, size = 4.0,
+                 label = str_c("PERMANOVA: R2 ", format(round(resms$R2[1],3), nsmall = 3), ", p = ", resms$`Pr(>F)`)
         ))
 
 (brayplotht <- bray_hypertension %>%
@@ -301,52 +299,13 @@ resht <- adonis2(brayht ~ HT_new, data = dfht) # PERMANOVA
         scale_alpha_manual(guide = "none") +
         theme_Publication() +
         labs(color = "", alpha = "") +
-        annotate("text", x= Inf, y = Inf, hjust = 1, vjust = 1,
-                 label = str_c("PERMANOVA: p = ", resht$`Pr(>F)`, ", r2 = ", 
-                               format(round(resht$R2[1],3), nsmall = 3))
+        annotate("text", x= Inf, y = Inf, hjust = 1, vjust = 1, size = 4.0,
+                 label = str_c("PERMANOVA: R2 ", format(round(resht$R2[1],3), nsmall = 3), ", p = ", resht$`Pr(>F)`)
         ))
 
-(brayplots <- ggarrange(brayplotdm, brayplotms, brayplotht, nrow = 3, ncol = 1, labels = c("D", "H", "L")))
+(brayplots <- ggarrange(brayplotdm, brayplotms, brayplotht, nrow = 3, ncol = 1, labels = c("D", "H", "L"), legend = "bottom"))
 ggsave("results/ordination/brayplots.pdf", width = 6, height = 18)
 
 #### Arrange total plot ####
-ggarrange(shanplots, brayplots, widths = c(0.6, 0.3))
+ggarrange(shanplots, brayplots, widths = c(0.6, 0.4))
 ggsave("results/diversityplots_diagnoses.pdf", width = 12, height = 14)
-
-#### Shannon stratified for ethnicity ####
-dftot <- dftot %>% filter(EthnicityTot != "Other") %>% droplevels(.) %>% filter(!is.na(EthnicityTot))
-
-(shaneth1 <- ggplot(data = dftot %>% filter(!is.na(DM_new)), aes(x = DM_new, y = shannon)) +
-        geom_violin(aes(alpha = DM_new), fill = pal_bmj()(7)[7], show.legend = FALSE) +
-        scale_alpha_manual(values = c(0.4, 1.0)) +
-        geom_boxplot(fill = "white", width = 0.2) +
-        labs(y = "Shannon index", x = "", alpha = "", fill = "") +
-        facet_wrap(~EthnicityTot) +
-        stat_compare_means(tip.length = 0, 
-                           label = "p.signif", method = "wilcox.test") +
-        theme_Publication() +
-        theme(axis.text.x = element_text(hjust = 1, angle = 45)))
-
-(shaneth2 <- ggplot(data = dftot %>% filter(!is.na(Dyslip_new)), aes(x = Dyslip_new, y = shannon)) +
-        geom_violin(aes(alpha = Dyslip_new), fill = pal_bmj()(4)[4], show.legend = FALSE) +
-        scale_alpha_manual(values = c(0.4, 1.0)) +
-        geom_boxplot(fill = "white", width = 0.2) +
-        labs(y = "Shannon index", x = "", alpha = "", fill = "") +
-        facet_wrap(~EthnicityTot) +
-        stat_compare_means(tip.length = 0, label = "p.signif", method = "wilcox.test") +
-        theme_Publication() +
-        theme(axis.text.x = element_text(hjust = 1, angle = 45)))
-
-(shaneth3 <- ggplot(data = dftot %>% filter(!is.na(HT_new)), aes(x = HT_new, y = shannon)) +
-        geom_violin(aes(alpha = HT_new), fill = pal_bmj()(3)[3], show.legend = FALSE) +
-        scale_alpha_manual(values = c(0.4, 1.0)) +
-        geom_boxplot(fill = "white", width = 0.2) +
-        labs(y = "Shannon index", x = "", alpha = "", fill = "") +
-        facet_wrap(~EthnicityTot) +
-        stat_compare_means(tip.length = 0, label = "p.signif", method = "wilcox.test") +
-        theme_Publication() +
-        theme(axis.text.x = element_text(hjust = 1, angle = 45)))
-
-
-ggarrange(shaneth1, shaneth2, shaneth3, nrow = 3, ncol = 1, labels = LETTERS[1:3])
-ggsave("results/alphadiversity/shannon_ethnicity_newdiagnoses.pdf", width = 8, height = 24)

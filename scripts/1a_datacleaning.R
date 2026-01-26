@@ -275,6 +275,9 @@ mbids <- str_c("S", str_remove(str_remove(sample_names(mb), "HELIBA_"), "HELIFU_
 df_wide_delta <- df_wide_delta %>% filter(ID %in% mbids)
 df_long <- df_long %>% filter(ID %in% mbids)
 
+heliusmb_baseline_unrarefied <- readRDS('data/16s/phyloseq/complete/phyloseq.RDS')
+heliusmb_baseline_unrarefied <- prune_samples(str_detect(sample_names(heliusmb_baseline_unrarefied), "HELIBA_"), heliusmb_baseline_unrarefied)
+
 ## Save files
 saveRDS(df_wide_delta, file = "data/clinicaldata_wide.RDS")
 saveRDS(df_long, file = "data/clinicaldata_long.RDS")

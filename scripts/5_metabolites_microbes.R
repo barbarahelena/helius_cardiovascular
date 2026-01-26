@@ -15,8 +15,8 @@ theme_Publication <- function(base_size=12, base_family="sans") {
                                           size = rel(0.8), hjust = 0.5),
                 #family = 'Helvetica'
                 text = element_text(),
-                panel.background = element_rect(colour = NA),
-                plot.background = element_rect(colour = NA),
+                panel.background = element_rect(colour = NA, fill = NA),
+                plot.background = element_rect(colour = NA, fill = NA),
                 panel.border = element_rect(colour = NA),
                 axis.title = element_text(face = "bold",size = rel(0.8)),
                 axis.title.y = element_text(angle=90,vjust =2),
@@ -43,39 +43,39 @@ theme_Publication <- function(base_size=12, base_family="sans") {
 
 
 ############### Associations with microbes ##################
-selection <- rio::import("data/ASVs_CBS.xlsx", header = FALSE)
+mace <- rio::import("results/260123_bvar/MACE.xlsx") |> filter(Model == "Adjusted for age" & padj < 0.05)
+maceplus <- rio::import("results/260123_bvar/MACEplus.xlsx") |> filter(Model == "Adjusted for age" & padj < 0.05)
+selection <- c(mace$ASV, maceplus$ASV)
+selection <- selection[which(!duplicated(selection))]
 met <- readRDS("data/metabolomics/metabolomics_paired.RDS")
 metsel <- met[str_detect(rownames(met), "HELIBA"),]
 metsel <- as.data.frame(metsel)
 metsel <- metsel %>% dplyr::select(!starts_with("X-"))
-metsel <- metsel %>% mutate(across(everything(.), ~log10(.x+1)),
-                            ID = rownames(.))
+metsel <- as.data.frame(log10(as.matrix(metsel)+ 1))
+metsel$ID <- rownames(metsel)
+head(metsel)[1:5,1:5]
+
 mb <- readRDS("data/phyloseq_rarefied_cleaned.RDS")
 sample_names(mb) <- str_remove(sample_names(mb),"_T1")
 mb <- prune_samples(str_detect(sample_names(mb), "HELIBA"), mb)
-mb <- prune_samples(sample_names(mb) %in% rownames(metsel), mb)
-mb <- prune_taxa(selection$...1, mb)
-tax <- readRDS("data/taxtable_rarefied_cleaned.RDS")
+mb <- clr(t(as(mb@otu_table, "matrix")) + 0.5)
+mb <- as.data.frame(mb)
+mb$ID <- rownames(mb)
+mbsel <- mb |> filter(ID %in% metsel$ID)
+mbsel <- mbsel |> dplyr::select(any_of(selection), ID)
 
-mb <- as.data.frame(t(as(mb@otu_table, "matrix")))
-head(mb)
-mbsel <- mb[, selection$...1]
-# colnames(mbsel) <- make.unique(tax$Tax[match(colnames(mbsel), tax$ASV)])
-mbsel <- mbsel %>% mutate(across(everything(.), ~clr(.x+0.5)))
-mbsel$ID <- rownames(mbsel)
+tax <- readRDS("data/taxtable_rarefied_cleaned.RDS")
 
 mbmet <- left_join(mbsel, metsel, by = "ID")
 dim(mbmet)
-names(mbmet)[1:17]
+names(mbmet)[1:23]
 res <- c()
-mbmet$asv <- NULL
-mbmet$met <- NULL
 plothist <- c()
-for(a in 1:18) {
+for(a in 1:23) {
     mbmet$asv <- mbmet[[a]]
     asvname <- names(mbmet)[a]
     plothist[[asvname]] <- gghistogram(mbmet$asv) + labs(x = asvname)
-    for(b in 20:(ncol(mbmet) -1)) {
+    for(b in 25:(ncol(mbmet) -1)) {
         mbmet$met <- mbmet[[b]]
         metname <- names(mbmet)[b]
         cor <- cor.test(mbmet$asv, y = mbmet$met, method = "spearman")
@@ -87,11 +87,12 @@ for(a in 1:18) {
     mbmet$asv <- NULL
 }
 
-ggarrange(plotlist = plothist, nrow = 4, ncol = 5, 
-          labels = c(LETTERS[1:18]))
-ggsave("results/asv_distribution.pdf", width = 12, height = 26)
+ggarrange(plotlist = plothist, nrow = 5, ncol = 5, 
+          labels = c(LETTERS[1:23]))
+ggsave("results/asv_distribution.pdf", width = 20, height = 26)
 
 res <- as.data.frame(res)
+head(res)
 res2 <- res %>% mutate(across(c(3:4), as.numeric)) %>% 
     filter(metabolite != "asv") %>% 
     group_by(ASV) %>% 
@@ -150,9 +151,9 @@ for(a in 1:nrow(reswide_rho)){
     }
 }
 
+length(plotlist)
 ggarrange(plotlist = plotlist[1:length(plotlist)], 
-          nrow = 5, ncol = 3, labels = LETTERS[1:13], 
-          common.legend = TRUE, legend = "bottom")
+          nrow = 5, ncol = 3, labels = LETTERS[1:length(plotlist)])
 ggsave("results/correlations/volcano_correlations.pdf", width = 15, height = 24)
 
 infofile <- rio::import("data/metabolomics/Info_HELIUS_metabolomics.xlsx") %>% 
@@ -162,9 +163,12 @@ tot <- res2 %>% filter(padj < 0.05) %>% arrange(padj) %>%
                 left_join(., tax %>% dplyr::select(ASV, Family, Genus, Tax), by = 'ASV') %>% 
                 left_join(., infofile, by = 'metabolite')
 nlevels(as.factor(tot$metabolite))
+summary(as.factor(tot$superpathway))
 
 tot %>% filter(superpathway != "Xenobiotics") %>% dplyr::select(metabolite, Tax, superpathway, subpathway)
 tot %>% arrange(padj)
+tot |> arrange(-rho)
+tot |> filter(Tax == "[Ruminococcus] gnavus group spp.")
 (asv_indole <- tot %>% filter(metabolite == "1H-indole-7-acetic acid"))
 (asv_andro <- tot %>% filter(metabolite == "5alpha-androstan-3beta,17alpha-diol disulfate"))
 (asv_entero <- tot %>% filter(metabolite == "enterolactone sulfate"))
@@ -182,11 +186,14 @@ tot %>% filter(metabolite == "isoursodeoxycholate") %>% dplyr::select(metabolite
 tot %>% filter(metabolite == "glucuronate") %>% dplyr::select(metabolite, rho, padj, Tax, subpathway)
 tot %>% filter(metabolite == "4-hydroxycoumarin") %>% dplyr::select(metabolite, rho, padj, Tax, subpathway)
 
-tot %>% group_by(metabolite) %>% summarise(n = nlevels(as.factor(ASV))) %>% arrange(-n)
+tot %>% group_by(metabolite) %>% summarise(n = nlevels(as.factor(ASV)), meanrho = mean(rho)) %>% arrange(-n)
+tot %>% group_by(Tax) %>% summarise(n = nlevels(as.factor(metabolite))) %>% arrange(-n)
 tot %>% group_by(ASV) %>% summarise(n = nlevels(as.factor(metabolite))) %>% arrange(-n)
 tot %>% group_by(subpathway) %>% summarise(n = nlevels(as.factor(ASV))) %>% arrange(-n)
 
-totsel <- tot %>% arrange(pval) %>% slice(1:25)
+totsel <- tot %>% arrange(padj) %>% slice(1:20)
+totrum <- tot |> filter(Tax == "[Ruminococcus] gnavus group spp.") |> slice(1:10)
+totsel <- rbind(totsel, totrum)
 plotlist3 <- c()
 for(a in 1:nrow(totsel)) {
     asvname <- totsel$ASV[a]
@@ -202,7 +209,7 @@ for(a in 1:nrow(totsel)) {
                         labs(x = taxname, y = metname) +
                         theme_Publication()
 }
-ggarrange(plotlist = plotlist3, nrow = 5, ncol = 5, labels = LETTERS[1:25])
-ggsave("results/correlationplots.pdf", width = 16, height = 16)
+ggarrange(plotlist = plotlist3, nrow = 6, ncol = 5, labels = LETTERS[1:30])
+ggsave("results/correlationplots.pdf", width = 16, height = 25)
 
-plotlist3[[1]]
+plotlist3[[30]]
